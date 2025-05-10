@@ -1,4 +1,4 @@
-name: 🔍 Streamlit App Lint & Check
+name: ✅ Streamlit App Check
 
 on:
   push:
@@ -7,17 +7,17 @@ on:
     branches: [ main ]
 
 jobs:
-  check-app:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
+      - name: 🐍 Set up Python 3.10
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10  # ✅ Correct version for compatibility
+          python-version: '3.10'  # ✅ MUST be in quotes
 
       - name: 📦 Install dependencies
         run: |
