@@ -1,4 +1,3 @@
-
 import streamlit as st
 from docx import Document
 from pptx import Presentation
@@ -10,16 +9,17 @@ from datetime import date
 from tempfile import NamedTemporaryFile
 from pathlib import Path
 import json
+import re
 
 st.set_page_config(page_title="📄 Rackspace DocFactory", layout="wide")
 st.title("📄📊 Rackspace Documentation Factory")
 
-# Define directories
+# Setup directories
 TEMPLATE_DIR = Path("templates")
 TEMPLATE_INDEX = TEMPLATE_DIR / "templates_index.json"
 TEMPLATE_DIR.mkdir(exist_ok=True)
 
-# Load or init index
+# Load or initialize template index
 if TEMPLATE_INDEX.exists():
     template_index = json.loads(TEMPLATE_INDEX.read_text())
 else:
@@ -31,11 +31,11 @@ else:
 
 today = date.today().strftime("%Y%m%d")
 
-# Upload template
+# Sidebar – Template Upload
 st.sidebar.markdown("## 🧰 Template Management")
 with st.sidebar.expander("➕ Add or Update Template"):
-    uploaded = st.file_uploader("Upload .dotx or .pptx", type=["dotx", "pptx"])
-    doc_type = st.selectbox("Assign to Type", list(template_index.keys()))
+    uploaded = st.file_uploader("Upload .dot / .dotx / .pptx Template", type=["dot", "dotx", "pptx"])
+    doc_type = st.selectbox("Assign to Document Type", list(template_index.keys()))
     display_name = st.text_input("Template Display Name")
 
     if st.button("💾 Save Template") and uploaded and display_name:
@@ -48,14 +48,15 @@ with st.sidebar.expander("➕ Add or Update Template"):
         template_index[doc_type] = [e for e in template_index[doc_type] if e["name"] != display_name]
         template_index[doc_type].append(entry)
         TEMPLATE_INDEX.write_text(json.dumps(template_index, indent=2))
-        st.success(f"Template saved as {filename}")
+        st.success(f"✅ Template saved as {filename}")
 
-# Choose document type and template
+# Select template to use
 doc_type = st.selectbox("📄 Select Document Type", list(template_index.keys()))
 customer_name = st.text_input("👤 Customer Name")
 template_options = [t["name"] for t in template_index[doc_type]]
 template_name = st.selectbox("📑 Select Template", template_options)
 
+# Template logic
 template_path = None
 for t in template_index[doc_type]:
     if t["name"] == template_name:
@@ -64,12 +65,11 @@ for t in template_index[doc_type]:
 TEXT_ONLY_PLACEHOLDERS = {"CUSTOMER_NAME", "CITY NAME", "SA-NAME", "SA_EMAIL", "RAX_TEAM", "PARTNER_NAME"}
 
 if template_path and customer_name:
-    file_ext = template_path.split(".")[-1]
-    is_docx = template_path.endswith(".dotx") or template_path.endswith(".docx")
+    is_docx = template_path.endswith((".dotx", ".docx", ".dot"))
     is_pptx = template_path.endswith(".pptx")
     uploads = {}
 
-    # Load template
+    # Extract placeholders
     text_blocks = []
     if is_docx:
         doc = Document(template_path)
@@ -81,10 +81,10 @@ if template_path and customer_name:
                 if hasattr(shape, "text"):
                     text_blocks.append(shape.text)
 
-    import re
     raw_placeholders = re.findall(r"\{[^}]+\}", "\n".join(text_blocks))
     placeholders = list(dict.fromkeys([f"{{{ph.strip('{}').strip()}}}" for ph in raw_placeholders]))
 
+    # Step 1: Manual Text Inputs
     st.markdown("### ✏️ Fill in Required Fields")
     for ph in placeholders:
         base = ph.strip("{}").strip()
@@ -93,6 +93,7 @@ if template_path and customer_name:
             if val.strip():
                 uploads[ph] = val.strip()
 
+    # Step 2: Upload or Enter for Other Fields
     st.markdown("### 📎 Upload or Enter Remaining Content")
     for ph in placeholders:
         base = ph.strip("{}").strip()
@@ -120,6 +121,7 @@ if template_path and customer_name:
             elif val.strip():
                 uploads[ph] = val.strip()
 
+    # Step 3: Generate Output
     missing = [ph for ph in placeholders if ph not in uploads]
     if st.button("🛠️ Generate Document"):
         if missing:
